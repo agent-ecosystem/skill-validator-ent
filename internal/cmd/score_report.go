@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/spf13/cobra"
 
@@ -59,12 +60,33 @@ func runScoreReport(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Shorten Bedrock model IDs for display. The base library's text
+	// formatter truncates model names to 14 chars, which makes all
+	// Bedrock IDs like "us.anthropic.claude-..." look identical.
+	displayResults := shortenModelNames(results)
+
 	switch {
 	case reportList:
-		return report.List(os.Stdout, results, absDir, outputFormat)
+		return report.List(os.Stdout, displayResults, absDir, outputFormat)
 	case reportCompare:
-		return report.Compare(os.Stdout, results, absDir, outputFormat)
+		return report.Compare(os.Stdout, displayResults, absDir, outputFormat)
 	default:
-		return report.Default(os.Stdout, results, absDir, outputFormat)
+		return report.Default(os.Stdout, displayResults, absDir, outputFormat)
 	}
+}
+
+// bedrockModelPrefix matches Bedrock cross-region model ID prefixes
+// like "us.anthropic.", "eu.anthropic.", "ap.meta.", etc.
+var bedrockModelPrefix = regexp.MustCompile(`^[a-z]{2}\.[\w-]+\.`)
+
+// shortenModelNames returns shallow copies of cached results with Bedrock
+// regional prefixes stripped from model names for more readable display.
+func shortenModelNames(results []*judge.CachedResult) []*judge.CachedResult {
+	out := make([]*judge.CachedResult, len(results))
+	for i, r := range results {
+		cp := *r
+		cp.Model = bedrockModelPrefix.ReplaceAllString(r.Model, "")
+		out[i] = &cp
+	}
+	return out
 }

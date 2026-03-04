@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/agent-ecosystem/skill-validator/judge"
 	"github.com/agent-ecosystem/skill-validator/orchestrate"
 	"github.com/agent-ecosystem/skill-validator/skillcheck"
 	"github.com/agent-ecosystem/skill-validator/structure"
@@ -672,6 +673,38 @@ func TestConfig_ScoreReportExplicitModelStillFilters(t *testing.T) {
 	_, _, _ = executeCommand("score", "report", "--model", "explicit-filter", dir)
 	if reportModel != "explicit-filter" {
 		t.Errorf("explicit --model should be used as filter, got %q", reportModel)
+	}
+}
+
+func TestShortenModelNames(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"us.anthropic.claude-sonnet-4-5-20250929-v1:0", "claude-sonnet-4-5-20250929-v1:0"},
+		{"us.anthropic.claude-3-5-haiku-20241022-v1:0", "claude-3-5-haiku-20241022-v1:0"},
+		{"eu.anthropic.claude-sonnet-4-5-20250929-v1:0", "claude-sonnet-4-5-20250929-v1:0"},
+		{"ap.meta.llama-3-70b-v1:0", "llama-3-70b-v1:0"},
+		{"claude-sonnet-4-5-20250929", "claude-sonnet-4-5-20250929"},
+		{"some-other-model", "some-other-model"},
+	}
+	for _, tt := range tests {
+		results := shortenModelNames([]*judge.CachedResult{{Model: tt.input}})
+		if results[0].Model != tt.want {
+			t.Errorf("shortenModelNames(%q) = %q, want %q", tt.input, results[0].Model, tt.want)
+		}
+	}
+}
+
+func TestShortenModelNames_PreservesOriginal(t *testing.T) {
+	original := &judge.CachedResult{Model: "us.anthropic.claude-sonnet-4-5-20250929-v1:0"}
+	shortened := shortenModelNames([]*judge.CachedResult{original})
+
+	if original.Model == shortened[0].Model {
+		t.Error("shortenModelNames should return copies, not mutate originals")
+	}
+	if original.Model != "us.anthropic.claude-sonnet-4-5-20250929-v1:0" {
+		t.Errorf("original was mutated: %s", original.Model)
 	}
 }
 
