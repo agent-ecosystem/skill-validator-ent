@@ -99,14 +99,20 @@ func applyConfig(cmd *cobra.Command, cfg *config.Config) {
 	applyStringFlag(root.PersistentFlags(), "output", cfg.Output)
 	applyBoolFlag(root.PersistentFlags(), "emit-annotations", cfg.EmitAnnotations)
 
-	// Command-local flags (score evaluate, check, validate structure).
-	applyStringFlag(cmd.Flags(), "model", cfg.Model)
-	applyStringFlag(cmd.Flags(), "region", cfg.Region)
-	applyStringFlag(cmd.Flags(), "profile", cfg.Profile)
-	applyStringFlag(cmd.Flags(), "provider", cfg.Provider)
-	applyInt32Flag(cmd.Flags(), "max-response-tokens", cfg.MaxResponseTokens)
-	applyStringFlag(cmd.Flags(), "display", cfg.Display)
-	applyBoolFlag(cmd.Flags(), "full-content", cfg.FullContent)
+	// Score evaluate flags — only apply to the evaluate command.
+	// The "model" flag on "score report" is a filter (default empty), not a
+	// default model, so it must NOT be populated from config.
+	if cmd == scoreEvaluateCmd {
+		applyStringFlag(cmd.Flags(), "model", cfg.Model)
+		applyStringFlag(cmd.Flags(), "region", cfg.Region)
+		applyStringFlag(cmd.Flags(), "profile", cfg.Profile)
+		applyStringFlag(cmd.Flags(), "provider", cfg.Provider)
+		applyInt32Flag(cmd.Flags(), "max-response-tokens", cfg.MaxResponseTokens)
+		applyStringFlag(cmd.Flags(), "display", cfg.Display)
+		applyBoolFlag(cmd.Flags(), "full-content", cfg.FullContent)
+	}
+
+	// Flags shared across multiple commands (check, validate structure).
 	applyBoolFlag(cmd.Flags(), "strict", cfg.Strict)
 }
 

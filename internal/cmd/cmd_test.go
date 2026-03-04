@@ -45,6 +45,11 @@ func executeCommand(args ...string) (stdout, stderr string, err error) {
 	evalFullContent = false
 	evalMaxRespTokens = 500
 
+	// score report flags
+	reportList = false
+	reportCompare = false
+	reportModel = ""
+
 	// check flags
 	checkOnly = ""
 	checkSkip = ""
@@ -632,6 +637,41 @@ func TestConfig_DisplayAndMaxTokensFromConfig(t *testing.T) {
 	}
 	if strings.Contains(errStr, "--display must be") {
 		t.Errorf("config display: files should be valid, got: %v", err)
+	}
+}
+
+func TestConfig_ModelNotAppliedToScoreReport(t *testing.T) {
+	dir := fixtureDir(t, "valid-skill")
+	setupProjectConfig(t, "model: us.anthropic.claude-sonnet-4-5-20250929-v1:0\n")
+
+	// score report should NOT have its --model filter populated by config.
+	// The config "model" is for score evaluate (which model to call), not
+	// score report (which model to filter cached results by).
+	_, _, _ = executeCommand("score", "report", dir)
+	if reportModel != "" {
+		t.Errorf("config model should not apply to score report --model filter, got %q", reportModel)
+	}
+}
+
+func TestConfig_ModelNotAppliedToScoreReportCompare(t *testing.T) {
+	dir := fixtureDir(t, "valid-skill")
+	setupProjectConfig(t, "model: us.anthropic.claude-sonnet-4-5-20250929-v1:0\n")
+
+	// --compare should show ALL models, not be filtered to the config model.
+	_, _, _ = executeCommand("score", "report", "--compare", dir)
+	if reportModel != "" {
+		t.Errorf("config model should not filter --compare results, got %q", reportModel)
+	}
+}
+
+func TestConfig_ScoreReportExplicitModelStillFilters(t *testing.T) {
+	dir := fixtureDir(t, "valid-skill")
+	setupProjectConfig(t, "model: config-model\n")
+
+	// Explicit --model on CLI should still work as a filter for score report.
+	_, _, _ = executeCommand("score", "report", "--model", "explicit-filter", dir)
+	if reportModel != "explicit-filter" {
+		t.Errorf("explicit --model should be used as filter, got %q", reportModel)
 	}
 }
 
