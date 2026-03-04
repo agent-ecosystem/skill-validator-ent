@@ -9,3 +9,6 @@ coverage.out
 
 # Score caches
 .score_cache/
+
+# Local config (project-level)
+.skill-validator-ent.yaml

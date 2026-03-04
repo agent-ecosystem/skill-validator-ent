@@ -209,7 +209,7 @@ skill-validator-ent score report --model us.anthropic.claude-sonnet-4-5-20250929
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--model` | (required) | Bedrock model ID |
+| `--model` | (required) | Bedrock model ID (can be set via [config file](#configuration-file)) |
 | `--provider` | `bedrock` | LLM provider (only `bedrock` supported) |
 | `--region` | from AWS config | AWS region override |
 | `--profile` | from AWS config | AWS shared config profile override |
@@ -226,6 +226,84 @@ skill-validator-ent score report --model us.anthropic.claude-sonnet-4-5-20250929
 |------|---------|-------------|
 | `-o, --output` | `text` | Output format: `text`, `json`, or `markdown` |
 | `--emit-annotations` | `false` | Emit GitHub Actions `::error`/`::warning` annotations |
+| `-v, --verbose` | `false` | Enable verbose/debug logging to stderr |
+
+## Configuration file
+
+You can persist default flag values in a YAML config file so you don't have to pass `--model`, `--region`, `--profile`, etc. on every invocation. CLI flags always override config file values.
+
+### Config file locations
+
+The CLI looks for config files in two places (in order of precedence):
+
+1. **Project-level** — `.skill-validator-ent.yaml` in the current directory or any parent up to the git root
+2. **User-level** — resolved in this order:
+   - `$SKILL_VALIDATOR_CONFIG_DIR/config.yaml` (if the env var is set)
+   - `$XDG_CONFIG_HOME/skill-validator-ent/config.yaml` (if the env var is set)
+   - `~/.config/skill-validator-ent/config.yaml` (default)
+
+Project config values override user config values. CLI flags override both.
+
+### Example config file
+
+```yaml
+# ~/.config/skill-validator-ent/config.yaml
+model: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+region: us-east-1
+profile: bedrock
+```
+
+With this config, you can run:
+
+```bash
+# No need for --model, --region, --profile
+skill-validator-ent score evaluate path/to/skill/
+```
+
+Override any value per-invocation with CLI flags:
+
+```bash
+# Use a different model for this run
+skill-validator-ent score evaluate path/to/skill/ \
+  --model us.anthropic.claude-haiku-4-5-20251001-v1:0
+```
+
+### Supported config keys
+
+| Key | Equivalent flag |
+|-----|----------------|
+| `model` | `--model` |
+| `region` | `--region` |
+| `profile` | `--profile` |
+| `provider` | `--provider` |
+| `max_response_tokens` | `--max-response-tokens` |
+| `display` | `--display` |
+| `full_content` | `--full-content` |
+| `output` | `--output` |
+| `emit_annotations` | `--emit-annotations` |
+| `strict` | `--strict` |
+
+### Project-level config
+
+Place a `.skill-validator-ent.yaml` at your repo root to share defaults across a team:
+
+```yaml
+# .skill-validator-ent.yaml (commit this to your repo)
+model: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+region: us-east-1
+output: json
+strict: true
+```
+
+### Verbose / debug logging
+
+Use `--verbose` (or `-v`) to see which config files were loaded and other debug info:
+
+```bash
+skill-validator-ent --verbose score evaluate path/to/skill/
+```
+
+You can also set the `SKILL_VALIDATOR_DEBUG=1` environment variable for the same effect.
 
 ## Output formats
 

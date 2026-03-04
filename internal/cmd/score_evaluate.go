@@ -44,6 +44,12 @@ The path can be:
 Requires AWS credentials configured via environment, shared config, or instance profile.
 Use --region and --profile to override the default AWS configuration.`,
 	Args: cobra.ExactArgs(1),
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if evalModel == "" {
+			return fmt.Errorf("--model is required (set via flag or config file)")
+		}
+		return nil
+	},
 	RunE: runScoreEvaluate,
 }
 
@@ -58,7 +64,6 @@ func init() {
 	scoreEvaluateCmd.Flags().StringVar(&evalDisplay, "display", "aggregate", "reference score display: aggregate or files")
 	scoreEvaluateCmd.Flags().BoolVar(&evalFullContent, "full-content", false, "send full file content to LLM (default: truncate to 8,000 chars)")
 	scoreEvaluateCmd.Flags().Int32Var(&evalMaxRespTokens, "max-response-tokens", 500, "maximum tokens in the LLM response")
-	_ = scoreEvaluateCmd.MarkFlagRequired("model")
 	scoreCmd.AddCommand(scoreEvaluateCmd)
 }
 

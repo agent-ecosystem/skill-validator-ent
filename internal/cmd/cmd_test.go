@@ -7,6 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"github.com/agent-ecosystem/skill-validator/orchestrate"
 	"github.com/agent-ecosystem/skill-validator/skillcheck"
 	"github.com/agent-ecosystem/skill-validator/structure"
@@ -28,6 +31,7 @@ func executeCommand(args ...string) (stdout, stderr string, err error) {
 	// Cobra reuses the command tree across calls.
 	outputFormat = "text"
 	emitAnnotations = false
+	verbose = false
 
 	// score evaluate flags
 	evalProvider = "bedrock"
@@ -52,8 +56,22 @@ func executeCommand(args ...string) (stdout, stderr string, err error) {
 	skipOrphans = false
 	strictStructure = false
 
+	// Reset cobra's Changed state on all flags so that config values
+	// can be applied in tests that don't pass CLI flags.
+	resetFlagChanged(rootCmd)
+
 	err = rootCmd.Execute()
 	return outBuf.String(), errBuf.String(), err
+}
+
+// resetFlagChanged resets the Changed state on all flags in the command tree
+// so that cobra doesn't think flags were explicitly set by a prior test.
+func resetFlagChanged(cmd *cobra.Command) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+	cmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+	for _, sub := range cmd.Commands() {
+		resetFlagChanged(sub)
+	}
 }
 
 // fixtureDir returns the absolute path to a testdata fixture.
@@ -255,12 +273,29 @@ func TestDetectAndResolve_NoSkill(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestScoreEvaluate_RequiresModel(t *testing.T) {
-	_, _, err := executeCommand("score", "evaluate", "testdata/valid-skill")
+	dir := fixtureDir(t, "valid-skill")
+	// Isolate from any real project config that might supply a model.
+	noConfigDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(noConfigDir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SKILL_VALIDATOR_CONFIG_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(noConfigDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+
+	_, _, err = executeCommand("score", "evaluate", dir)
 	if err == nil {
 		t.Fatal("expected error when --model is missing")
 	}
-	if !strings.Contains(err.Error(), "required flag") {
-		t.Errorf("expected 'required flag' error, got: %v", err)
+	if !strings.Contains(err.Error(), "--model is required") {
+		t.Errorf("expected '--model is required' error, got: %v", err)
 	}
 }
 
@@ -454,5 +489,185 @@ func TestCommandTree(t *testing.T) {
 		if !found {
 			t.Errorf("expected subcommand %q not found on root", name)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Config integration tests
+// ---------------------------------------------------------------------------
+
+// setupProjectConfig creates a temp project root with .git and a config file,
+// clears user config env vars, and chdirs into the project root. It registers
+// cleanup to restore the original working directory.
+func setupProjectConfig(t *testing.T, yaml string) {
+	t.Helper()
+	projRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projRoot, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projRoot, ".skill-validator-ent.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SKILL_VALIDATOR_CONFIG_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(projRoot); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+}
+
+func TestConfig_ModelFromConfigFile(t *testing.T) {
+	setupProjectConfig(t, "model: config-model\n")
+
+	// score evaluate with a nonexistent path — we expect a path error,
+	// NOT a "model is required" error, because the config should supply it.
+	_, _, err := executeCommand("score", "evaluate", "/nonexistent/path/xyz")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "--model is required") {
+		t.Errorf("config should have supplied model, got: %v", err)
+	}
+}
+
+func TestConfig_CLIFlagOverridesConfig(t *testing.T) {
+	// Resolve fixture dir BEFORE changing cwd.
+	dir := fixtureDir(t, "valid-skill")
+	setupProjectConfig(t, "model: config-model\nprovider: anthropic\n")
+
+	// --provider flag should override config's "anthropic" with "bedrock".
+	// --model flag should override config's "config-model".
+	// This should get past model and provider checks, then fail at AWS.
+	_, _, err := executeCommand("score", "evaluate",
+		"--provider", "bedrock",
+		"--model", "cli-model",
+		dir)
+	// Should fail at AWS client build, not at flag validation.
+	if err != nil && strings.Contains(err.Error(), "--model is required") {
+		t.Errorf("CLI flag should have overridden config, got: %v", err)
+	}
+}
+
+func TestConfig_VerboseFlag(t *testing.T) {
+	_, _, err := executeCommand("--verbose", "--version")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestConfig_StrictFromConfig(t *testing.T) {
+	dir := fixtureDir(t, "warnings-only-skill")
+	setupProjectConfig(t, "strict: true\n")
+
+	// Without config strict, warnings-only-skill exits with ExitWarning (2).
+	// With strict: true from config, warnings should be promoted to ExitError (1).
+	_, _, err := executeCommand("validate", "structure", dir)
+	ec, ok := err.(exitCodeError)
+	if !ok {
+		t.Fatalf("expected exitCodeError, got %T: %v", err, err)
+	}
+	if ec.code != ExitError {
+		t.Errorf("exit code = %d, want %d (strict from config should promote warnings)", ec.code, ExitError)
+	}
+}
+
+func TestConfig_StrictFromConfigOverriddenByCLI(t *testing.T) {
+	dir := fixtureDir(t, "warnings-only-skill")
+	setupProjectConfig(t, "strict: true\n")
+
+	// Explicit --strict=false on CLI should override config's strict: true.
+	_, _, err := executeCommand("validate", "structure", "--strict=false", dir)
+	ec, ok := err.(exitCodeError)
+	if !ok {
+		t.Fatalf("expected exitCodeError, got %T: %v", err, err)
+	}
+	if ec.code != ExitWarning {
+		t.Errorf("exit code = %d, want %d (CLI --strict=false should override config)", ec.code, ExitWarning)
+	}
+}
+
+func TestConfig_OutputFormatFromConfig(t *testing.T) {
+	dir := fixtureDir(t, "valid-skill")
+	setupProjectConfig(t, "output: json\n")
+
+	// Run a command so PersistentPreRunE applies config.
+	_, _, _ = executeCommand("validate", "structure", dir)
+	// The report writes to os.Stdout directly (not cobra buffer), so we
+	// verify the config was applied by checking the variable.
+	if outputFormat != "json" {
+		t.Errorf("outputFormat = %s, want json (from config)", outputFormat)
+	}
+}
+
+func TestConfig_EmitAnnotationsFromConfig(t *testing.T) {
+	dir := fixtureDir(t, "valid-skill")
+	setupProjectConfig(t, "emit_annotations: true\n")
+
+	// Run a command so PersistentPreRunE applies config.
+	_, _, _ = executeCommand("validate", "structure", dir)
+	if !emitAnnotations {
+		t.Error("emitAnnotations = false, want true (from config)")
+	}
+}
+
+func TestConfig_DisplayAndMaxTokensFromConfig(t *testing.T) {
+	// This test verifies that display and max_response_tokens config values
+	// are applied to score evaluate flags. We can't run a full score without
+	// AWS credentials, but we can verify the config doesn't cause a model error
+	// and instead fails at the AWS stage.
+	setupProjectConfig(t, "model: cfg-model\ndisplay: files\nmax_response_tokens: 200\nfull_content: true\n")
+
+	_, _, err := executeCommand("score", "evaluate", "/nonexistent/path/xyz")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	// Should NOT fail on model-required or display validation.
+	errStr := err.Error()
+	if strings.Contains(errStr, "--model is required") {
+		t.Errorf("config should have supplied model, got: %v", err)
+	}
+	if strings.Contains(errStr, "--display must be") {
+		t.Errorf("config display: files should be valid, got: %v", err)
+	}
+}
+
+func TestConfig_VerboseEnvVar(t *testing.T) {
+	t.Setenv("SKILL_VALIDATOR_DEBUG", "1")
+	_, _, err := executeCommand("--version")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestConfig_NoConfigBehavesLikeToday(t *testing.T) {
+	dir := fixtureDir(t, "valid-skill")
+
+	// Chdir to a temp dir with .git so no project config is found.
+	noConfigDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(noConfigDir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SKILL_VALIDATOR_CONFIG_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(noConfigDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+
+	// With no config files and no --model flag, should get model-required error.
+	_, _, err = executeCommand("score", "evaluate", dir)
+	if err == nil {
+		t.Fatal("expected error when --model is missing")
+	}
+	if !strings.Contains(err.Error(), "--model is required") {
+		t.Errorf("expected '--model is required' error, got: %v", err)
 	}
 }

@@ -1,0 +1,33 @@
+# skill-validator-ent configuration
+# Copy this file to .skill-validator-ent.yaml and uncomment the values you want.
+# CLI flags always override these values.
+
+# Bedrock model ID (required for score evaluate)
+# model: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+
+# AWS region
+# region: us-east-1
+
+# AWS shared config profile
+# profile: bedrock
+
+# LLM provider (only "bedrock" is supported)
+# provider: bedrock
+
+# Maximum tokens in the LLM response (default: 500)
+# max_response_tokens: 500
+
+# Reference score display: "aggregate" or "files"
+# display: aggregate
+
+# Send full file content to LLM without truncation (default: false)
+# full_content: false
+
+# Output format: "text", "json", or "markdown"
+# output: text
+
+# Emit GitHub Actions ::error/::warning annotations (default: false)
+# emit_annotations: false
+
+# Treat warnings as errors in validate structure and check (default: false)
+# strict: false
