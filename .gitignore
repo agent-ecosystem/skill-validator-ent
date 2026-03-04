@@ -1,0 +1,11 @@
+# JetBrains IDE files
+.idea/
+
+# Binary
+skill-validator-ent
+
+# Test reports
+coverage.out
+
+# Score caches
+.score_cache/

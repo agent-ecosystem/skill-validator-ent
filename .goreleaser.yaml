@@ -1,0 +1,30 @@
+version: 2
+
+builds:
+  - binary: skill-validator-ent
+    main: ./cmd/skill-validator-ent
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - format: tar.gz
+
+brews:
+  - directory: Formula
+    repository:
+      owner: agent-ecosystem
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/agent-ecosystem/skill-validator-ent
+    description: Enterprise CLI for validating and scoring Agent Skill packages via AWS Bedrock
+    license: MIT
+    install: |
+      bin.install "skill-validator-ent"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/skill-validator-ent --version")
