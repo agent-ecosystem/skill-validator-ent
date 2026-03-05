@@ -1,5 +1,5 @@
-github.com/agent-ecosystem/skill-validator v1.0.0 h1:mrgPJ5gIvfbC2ga3+ijYaED5LnkitQMA5tw1SZ3qQBQ=
-github.com/agent-ecosystem/skill-validator v1.0.0/go.mod h1:z8IfkyzEsqNBVjluc0nGdIevgHNSgUKHOlsYGjggS3M=
+github.com/agent-ecosystem/skill-validator v1.1.0 h1:f5MKqIbsmXQI3vXNFd5Pl+4nqoAxZulKq4iUR2Z0e6o=
+github.com/agent-ecosystem/skill-validator v1.1.0/go.mod h1:z8IfkyzEsqNBVjluc0nGdIevgHNSgUKHOlsYGjggS3M=
 github.com/aws/aws-sdk-go-v2 v1.41.3 h1:4kQ/fa22KjDt13QCy1+bYADvdgcxpfH18f0zP542kZA=
 github.com/aws/aws-sdk-go-v2 v1.41.3/go.mod h1:mwsPRE8ceUUpiTgF7QmQIJ7lgsKUPQOUl3o72QBrE1o=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.6 h1:N4lRUXZpZ1KVEUn6hxtco/1d2lgYhNn1fHkkl8WhlyQ=

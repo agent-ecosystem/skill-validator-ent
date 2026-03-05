@@ -3,7 +3,7 @@ module github.com/agent-ecosystem/skill-validator-ent
 go 1.25.5
 
 require (
-	github.com/agent-ecosystem/skill-validator v1.0.0
+	github.com/agent-ecosystem/skill-validator v1.1.0
 	github.com/aws/aws-sdk-go-v2 v1.41.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.14
 	github.com/aws/aws-sdk-go-v2/service/bedrockruntime v1.50.1
