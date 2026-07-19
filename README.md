@@ -1,10 +1,11 @@
 # skill-validator-ent
 
+> [!IMPORTANT]
+> **This repository is archived and no longer maintained.** It was built for a specific internal use case that no longer exists. No further updates or releases will be made, and the Homebrew formula has been removed. The base [skill-validator](https://github.com/agent-ecosystem/skill-validator) project is unaffected. The code remains available for reference, and you're welcome to fork it if it's useful to you.
+
 Enterprise CLI for validating, analyzing, and scoring Agent Skill packages using AWS Bedrock.
 
 This tool wraps the [skill-validator](https://github.com/agent-ecosystem/skill-validator) library and replaces direct Anthropic/OpenAI API access with AWS Bedrock's Converse API, so teams can run LLM-as-judge scoring using their existing AWS credentials.
-
-Future development may add other providers as needed.
 
 ## Prerequisites
 
@@ -14,17 +15,10 @@ Future development may add other providers as needed.
 
 ## Installation
 
-### From source
+This tool is no longer distributed via Homebrew. You can still build from source:
 
 ```bash
 go install github.com/agent-ecosystem/skill-validator-ent/cmd/skill-validator-ent@latest
-```
-
-### Homebrew
-
-```bash
-brew tap agent-ecosystem/homebrew-tap
-brew install skill-validator-ent
 ```
 
 ## Command Reference
